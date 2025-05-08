@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>綜合能力測驗</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .question {
+            margin-bottom: 20px;
+        }
+        .result {
+            margin-top: 20px;
+            display: none;
+        }
+        canvas {
+            max-width: 400px;
+            margin: 20px auto;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>綜合能力測驗</h1>
+    <p>請回答以下60道題目，涵蓋圖形推理、數字邏輯和生活情境，請選擇最接近您做法的選項。完成後點擊「提交」查看您的能力分析。</p>
+    <div id="quiz">
+        <!-- 題目將由JS動態生成 -->
+    </div>
+    <button onclick="submitQuiz()">提交</button>
+    <div id="result" class="result">
+        <h2>您的能力分析</h2>
+        <canvas id="radarChart"></canvas>
+        <div id="scores"></div>
+    </div>
+
+    <script>
+        const abilities = [
+            '觀察力', '分析力', '理解力', '記憶力', 
+            '預測力', '規劃力', '執行力', '複製力'
+        ];
+
+        // 題目與選項分數映射
+        const questions = [
+            // 觀察力 (8題)
+            { text: '你看到一張圖表，顯示某產品的月銷量，你會先注意什麼？（圖表為折線圖，X軸為月份，Y軸為銷量）', options: [
+                { text: '檢查每個數據點的具體數值', score: { 觀察力: 3 } },
+                { text: '分析銷量的整體趨勢', score: { 分析力: 2 } },
+                { text: '猜測下個月的銷量變化', score: { 預測力: 1 } },
+                { text: '記住圖表的標題和單位', score: { 記憶力: 1 } }
+            ]},
+            { text: '你家中燈泡突然閃爍，你會先怎麼做？', options: [
+                { text: '檢查燈泡是否鬆動或燈座有無損壞', score: { 觀察力: 3 } },
+                { text: '立刻更換新燈泡試試', score: { 執行力: 2 } },
+                { text: '猜測可能是電壓不穩', score: { 預測力: 1 } },
+                { text: '聯繫電工處理', score: {} }
+            ]},
+            { text: '你看到一幅圖形序列：三角形、正方形、五邊形，下一個圖形是什麼？', options: [
+                { text: '觀察圖形邊數增加的規律，推測是六邊形', score: { 觀察力: 3, 分析力: 1 } },
+                { text: '直接猜測是圓形', score: { 預測力: 2 } },
+                { text: '回想類似的圖形題規律', score: { 記憶力: 1 } },
+                { text: '隨意選一個圖形', score: {} }
+            ]},
+            { text: '你在超市挑選蔬菜，發現有些葉子發黃，你會怎麼做？', options: [
+                { text: '檢查葉子的分佈和顏色變化', score: { 觀察力: 3 } },
+                { text: '比較不同攤位的蔬菜品質', score: { 分析力: 2 } },
+                { text: '直接挑看起來最好的', score: { 執行力: 1 } },
+                { text: '問店員哪個新鮮', score: {} }
+            ]},
+            { text: '你參加一個會議，投影幕上的圖表有誤，你會先做什麼？', options: [
+                { text: '檢查圖表的數據標籤和軸線', score: { 觀察力: 3 } },
+                { text: '分析圖表錯誤的可能原因', score: { 分析力: 2 } },
+                { text: '立刻向主持人反應', score: { 執行力: 1 } },
+                { text: '記住錯誤的數據點', score: { 記憶力: 1 } }
+            ]},
+            { text: '你看到一張地圖，標示了三個地點A、B、C，你會先注意什麼？', options: [
+                { text: '觀察三個地點的相對位置和距離', score: { 觀察力: 3 } },
+                { text: '分析哪條路徑最短', score: { 分析力: 2 } },
+                { text: '制定從A到C的路線計劃', score: { 規劃力: 1 } },
+                { text: '記住地點的名稱', score: { 記憶力: 1 } }
+            ]},
+            { text: '你在咖啡廳，服務員送錯飲料，你會怎麼做？', options: [
+                { text: '檢查飲料的外觀和標籤', score: { 觀察力: 3 } },
+                { text: '立刻告知服務員更正', score: { 執行力: 2 } },
+                { text: '猜測是否是其他桌的飲料', score: { 預測力: 1 } },
+                { text: '先喝一口試試', score: {} }
+            ]},
+            { text: '你看到一組圖形：紅色圓形、藍色三角形、綠色正方形，下一個是什麼？', options: [
+                { text: '觀察顏色和形狀的循環，推測是紅色五邊形', score: { 觀察力: 3, 分析力: 1 } },
+                { text: '猜測是藍色圓形', score: { 預測力: 2 } },
+                { text: '回想類似的圖形序列', score: { 記憶力: 1 } },
+                { text: '隨意選一個組合', score: {} }
+            ]},
+            // 分析力 (8題)
+            { text: '你看到一組數列：2, 5, 11, 23，下一項是什麼？', options: [
+                { text: '分析數列規律（每項為前項*2+1），推測是47', score: { 分析力: 3 } },
+                { text: '猜測可能是50左右', score: { 預測力: 2 } },
+                { text: '回想類似的數列題', score: { 記憶力: 1 } },
+                { text: '隨意選一個數字', score: {} }
+            ]},
+            { text: '你的電腦運行緩慢，你會先怎麼做？', options: [
+                { text: '檢查硬碟空間和背景程式', score: { 分析力: 3 } },
+                { text: '立刻重啟電腦', score: { 執行力: 2 } },
+                { text: '猜測可能是病毒感染', score: { 預測力: 1 } },
+                { text: '聯繫技術支援', score: {} }
+            ]},
+            { text: '你收到一張銷售報表，顯示某產品銷量下降，你會怎麼做？', options: [
+                { text: '比較歷史數據，分析下降原因', score: { 分析力: 3 } },
+                { text: '猜測可能是市場趨勢變化', score: { 預測力: 2 } },
+                { text: '制定新的銷售計劃', score: { 規劃力: 1 } },
+                { text: '直接聯繫銷售團隊', score: { 執行力: 1 } }
+            ]},
+            { text: '你在玩數獨遊戲，卡在某格，你會怎麼做？', options: [
+                { text: '分析每行每列的可能數字', score: { 分析力: 3 } },
+                { text: '試填一個數字，錯了再改', score: { 執行力: 2 } },
+                { text: '回想類似的數獨解法', score: { 記憶力: 1 } },
+                { text: '放棄，換新遊戲', score: {} }
+            ]},
+            { text: '你需要買一台空氣清淨機，市場上有許多型號，你會怎麼做？', options: [
+                { text: '比較各型號的功能和價格', score: { 分析力: 3 } },
+                { text: '直接買評價最高的', score: { 執行力: 2 } },
+                { text: '猜測哪款最適合你的房間', score: { 預測力: 1 } },
+                { text: '問朋友推薦', score: {} }
+            ]},
+            { text: '你看到一組數據：產品A利潤率10%，B為15%，C為8%，你會怎麼做？', options: [
+                { text: '分析哪個產品的投資回報最高', score: { 分析力: 3 } },
+                { text: '記住每項產品的利潤率', score: { 記憶力: 2 } },
+                { text: '猜測哪個產品未來表現最好', score: { 預測力: 1 } },
+                { text: '直接選利潤率最高的', score: { 執行力: 1 } }
+            ]},
+            { text: '你的手機電量下降很快，你會怎麼做？', options: [
+                { text: '檢查哪些應用耗電最多', score: { 分析力: 3 } },
+                { text: '立刻關閉不必要的應用', score: { 執行力: 2 } },
+                { text: '猜測可能是電池老化', score: { 預測力: 1 } },
+                { text: '直接充電，暫時不管', score: {} }
+            ]},
+            { text: '你在解決一個邏輯題：若A>B且B>C，則A>C，你會怎麼做？', options: [
+                { text: '分析條件的邏輯關係', score: { 分析力: 3 } },
+                { text: '回想類似的邏輯規則', score: { 記憶力: 2 } },
+                { text: '直接得出結論', score: { 執行力: 1 } },
+                { text: '覺得太複雜，跳過', score: {} }
+            ]},
+            // 理解力 (7題)
+            { text: '你讀到一篇科技文章，充滿專業術語，你會怎麼做？', options: [
+                { text: '試著理解文章的主旨和核心概念', score: { 理解力: 3 } },
+                { text: '記住關鍵術語和定義', score: { 記憶力: 2 } },
+                { text: '分析文章的論述邏輯', score: { 分析力: 1 } },
+                { text: '跳過難懂的部分', score: {} }
+            ]},
+            { text: '你在看一張流程圖，描述訂單處理步驟，你會怎麼做？', options: [
+                { text: '理解每個步驟的目的和順序', score: { 理解力: 3 } },
+                { text: '記住流程圖的關鍵節點', score: { 記憶力: 2 } },
+                { text: '分析流程的效率', score: { 分析力: 1 } },
+                { text: '快速瀏覽後忽略', score: {} }
+            ]},
+            { text: '你的朋友在爭論某個社會議題，你會怎麼做？', options: [
+                { text: '傾聽並理解雙方的觀點', score: { 理解力: 3 } },
+                { text: '分析哪方論點更有理', score: { 分析力: 2 } },
+                { text: '提出自己的看法', score: { 執行力: 1 } },
+                { text: '避免參與爭論', score: {} }
+            ]},
+            { text: '你在學一門新語言，語法很複雜，你會怎麼做？', options: [
+                { text: '理解語法的核心規則', score: { 理解力: 3 } },
+                { text: '記住語法例句', score: { 記憶力: 2 } },
+                { text: '模仿母語者的說法', score: { 複製力: 1 } },
+                { text: '只學簡單的對話', score: {} }
+            ]},
+            { text: '你看到一張地圖，顯示城市交通流量，你會怎麼做？', options: [
+                { text: '理解流量分佈的原因', score: { 理解力: 3 } },
+                { text: '觀察哪條路線最擁堵', score: { 觀察力: 2 } },
+                { text: '猜測未來的交通狀況', score: { 預測力: 1 } },
+                { text: '直接選最短路線', score: { 執行力: 1 } }
+            ]},
+            { text: '你的主管交代任務，但要求不清，你會怎麼做？', options: [
+                { text: '提問以理解任務目標', score: { 理解力: 3 } },
+                { text: '立刻開始做，邊做邊問', score: { 執行力: 2 } },
+                { text: '回想類似任務的做法', score: { 記憶力: 1 } },
+                { text: '等主管再說清楚', score: {} }
+            ]},
+            { text: '你在看一部科幻電影，劇情很複雜，你會怎麼做？', options: [
+                { text: '理解劇情的背景和主題', score: { 理解力: 3 } },
+                { text: '猜測劇情的後續發展', score: { 預測力: 2 } },
+                { text: '記住關鍵角色和情節', score: { 記憶力: 1 } },
+                { text: '只看特效，忽略劇情', score: {} }
+            ]},
+            // 記憶力 (7題)
+            { text: '你需要記住一個新項目的10個關鍵詞，你會怎麼做？', options: [
+                { text: '用聯想法記住每個詞', score: { 記憶力: 3 } },
+                { text: '立刻記錄到筆記本', score: { 執行力: 2 } },
+                { text: '理解每個詞的意義', score: { 理解力: 1 } },
+                { text: '只記重要的幾個', score: {} }
+            ]},
+            { text: '你在準備考試，內容繁多，你會怎麼做？', options: [
+                { text: '製作筆記，反覆記憶重點', score: { 記憶力: 3 } },
+                { text: '制定複習計劃', score: { 規劃力: 2 } },
+                { text: '猜測考試的重點', score: { 預測力: 1 } },
+                { text: '臨時抱佛腳', score: {} }
+            ]},
+            { text: '你參加一個導覽團，導覽員講了很多歷史，你會怎麼做？', options: [
+                { text: '記住關鍵事件和日期', score: { 記憶力: 3 } },
+                { text: '理解歷史的背景', score: { 理解力: 2 } },
+                { text: '拍照留念，之後再看', score: { 執行力: 1 } },
+                { text: '隨意聽，享受氣氛', score: {} }
+            ]},
+            { text: '你在超市忘帶購物清單，你會怎麼做？', options: [
+                { text: '回想清單上的每項物品', score: { 記憶力: 3 } },
+                { text: '按習慣買常用物品', score: { 執行力: 2 } },
+                { text: '規劃買什麼最划算', score: { 規劃力: 1 } },
+                { text: '隨意買，漏了再來', score: {} }
+            ]},
+            { text: '你需要複述一個會議的內容，你會怎麼做？', options: [
+                { text: '回想會議的細節和結論', score: { 記憶力: 3 } },
+                { text: '專注傳達會議的主旨', score: { 理解力: 2 } },
+                { text: '直接講，想到什麼說什麼', score: { 執行力: 1 } },
+                { text: '簡化內容，講重點', score: {} }
+            ]},
+            { text: '你在學新樂器，樂譜很複雜，你會怎麼做？', options: [
+                { text: '記住樂譜的音符和節奏', score: { 記憶力: 3 } },
+                { text: '模仿老師的指法', score: { 複製力: 2 } },
+                { text: '制定練習計劃', score: { 規劃力: 1 } },
+                { text: '每天堅持練習', score: { 執行力: 1 } }
+            ]},
+            { text: '你需要記住一個電話號碼，你會怎麼做？', options: [
+                { text: '重複號碼並聯想規律', score: { 記憶力: 3 } },
+                { text: '立刻輸入手機儲存', score: { 執行力: 2 } },
+                { text: '分析號碼的區域碼', score: { 分析力: 1 } },
+                { text: '只記前幾碼，之後再看', score: {} }
+            ]},
+            // 預測力 (7題)
+            { text: '你看到天氣預報說60%降雨機率，你會怎麼做？', options: [
+                { text: '根據雲量猜測是否真的會下雨', score: { 預測力: 3 } },
+                { text: '檢查當前的天氣狀況', score: { 觀察力: 2 } },
+                { text: '制定帶傘的備案計劃', score: { 規劃力: 1 } },
+                { text: '不管預報，照常出門', score: {} }
+            ]},
+            { text: '你在投資股票，市場波動大，你會怎麼做？', options: [
+                { text: '預測市場的短期趨勢', score: { 預測力: 3 } },
+                { text: '分析公司的財務報表', score: { 分析力: 2 } },
+                { text: '回想過去的市場走勢', score: { 記憶力: 1 } },
+                { text: '直接賣出，減少風險', score: { 執行力: 1 } }
+            ]},
+            { text: '你在玩撲克牌，對手行為異常，你會怎麼做？', options: [
+                { text: '猜測對手的牌型', score: { 預測力: 3 } },
+                { text: '觀察對手的表情和動作', score: { 觀察力: 2 } },
+                { text: '分析牌局的概率', score: { 分析力: 1 } },
+                { text: '隨機出牌，試試運氣', score: {} }
+            ]},
+            { text: '你計劃一場戶外活動，天氣不確定，你會怎麼做？', options: [
+                { text: '預測活動當天的天氣', score: { 預測力: 3 } },
+                { text: '制定室內備案計劃', score: { 規劃力: 2 } },
+                { text: '檢查目前的氣象數據', score: { 觀察力: 1 } },
+                { text: '照常進行，隨機應變', score: { 執行力: 1 } }
+            ]},
+            { text: '你在安排會議，參與者可能有分歧，你會怎麼做？', options: [
+                { text: '預測哪些議題可能引發爭議', score: { 預測力: 3 } },
+                { text: '制定詳細的會議議程', score: { 規劃力: 2 } },
+                { text: '回想上次會議的問題', score: { 記憶力: 1 } },
+                { text: '直接開會，當場解決', score: { 執行力: 1 } }
+            ]},
+            { text: '你在開發產品，市場需求不明，你會怎麼做？', options: [
+                { text: '預測目標客戶的需求', score: { 預測力: 3 } },
+                { text: '分析競爭產品的優缺點', score: { 分析力: 2 } },
+                { text: '執行小規模測試', score: { 執行力: 1 } },
+                { text: '等市場反饋再決定', score: {} }
+            ]},
+            { text: '你在準備考試，時間緊迫，你會怎麼做？', options: [
+                { text: '猜測考試的重點題型', score: { 預測力: 3 } },
+                { text: '制定最後衝刺計劃', score: { 規劃力: 2 } },
+                { text: '回想課堂的重點內容', score: { 記憶力: 1 } },
+                { text: '隨意複習，靠運氣', score: {} }
+            ]},
+            // 規劃力 (7題)
+            { text: '你要準備一次3天的旅行，你會怎麼打包？', options: [
+                { text: '用清單逐項檢查並打包', score: { 規劃力: 3 } },
+                { text: '想到什麼就收什麼', score: { 執行力: 2 } },
+                { text: '預測天氣決定帶什麼', score: { 預測力: 1 } },
+                { text: '帶錢去目的地買', score: {} }
+            ]},
+            { text: '你負責一個新項目，期限很緊，你會怎麼做？', options: [
+                { text: '制定詳細的任務時間表', score: { 規劃力: 3 } },
+                { text: '立刻開始可行任務', score: { 執行力: 2 } },
+                { text: '分析項目的風險點', score: { 分析力: 1 } },
+                { text: '請教主管建議', score: {} }
+            ]},
+            { text: '你要組織一個團隊活動，你會怎麼做？', options: [
+                { text: '列出活動流程和預算', score: { 規劃力: 3 } },
+                { text: '預測活動的潛在問題', score: { 預測力: 2 } },
+                { text: '參考類似的活動案例', score: { 複製力: 1 } },
+                { text: '臨時安排，隨機應變', score: {} }
+            ]},
+            { text: '你需要準備一場考試，你會怎麼做？', options: [
+                { text: '制定每天的複習計劃', score: { 規劃力: 3 } },
+                { text: '猜測考試的重點範圍', score: { 預測力: 2 } },
+                { text: '回想課堂的筆記內容', score: { 記憶力: 1 } },
+                { text: '臨時抱佛腳', score: {} }
+            ]},
+            { text: '你計劃重新裝修廚房，你會怎麼做？', options: [
+                { text: '設計布局並列出預算', score: { 規劃力: 3 } },
+                { text: '預測施工的潛在問題', score: { 預測力: 2 } },
+                { text: '參考別人的裝修案例', score: { 複製力: 1 } },
+                { text: '找設計師全包', score: {} }
+            ]},
+            { text: '你要幫朋友辦生日派對，你會怎麼做？', options: [
+                { text: '制定活動清單和時間表', score: { 規劃力: 3 } },
+                { text: '預測朋友的喜好', score: { 預測力: 2 } },
+                { text: '參考網上的派對點子', score: { 複製力: 1 } },
+                { text: '隨意準備，當天再看', score: {} }
+            ]},
+            { text: '你需要在兩週內完成報告，你會怎麼做？', options: [
+                { text: '制定分階段的寫作計劃', score: { 規劃力: 3 } },
+                { text: '立刻開始蒐集資料', score: { 執行力: 2 } },
+                { text: '分析報告的結構需求', score: { 分析力: 1 } },
+                { text: '拖到最後再做', score: {} }
+            ]},
+            // 執行力 (8題)
+            { text: '你需要組裝一張IKEA書桌，說明書不清晰，你會怎麼做？', options: [
+                { text: '按說明書嘗試，查影片輔助', score: { 執行力: 3, 複製力: 1 } },
+                { text: '直接動手，錯了再改', score: { 執行力: 2 } },
+                { text: '分析零件的功能', score: { 分析力: 1 } },
+                { text: '請別人幫忙組裝', score: {} }
+            ]},
+            { text: '你的打印機卡紙，你會怎麼做？', options: [
+                { text: '立刻檢查並取出卡紙', score: { 執行力: 3 } },
+                { text: '觀察卡紙的位置和原因', score: { 觀察力: 2 } },
+                { text: '猜測可能是機器故障', score: { 預測力: 1 } },
+                { text: '聯繫維修服務', score: {} }
+            ]},
+            { text: '你在廚房做飯，少了一種食材，你會怎麼做？', options: [
+                { text: '立刻用其他食材替代', score: { 執行力: 3 } },
+                { text: '去商店買缺少的食材', score: { 執行力: 2 } },
+                { text: '回想食譜的其他做法', score: { 記憶力: 1 } },
+                { text: '改做其他菜', score: {} }
+            ]},
+            { text: '你需要在短時間內完成簡報，你會怎麼做？', options: [
+                { text: '立刻開始製作，邊做邊改', score: { 執行力: 3 } },
+                { text: '制定簡報的結構計劃', score: { 規劃力: 2 } },
+                { text: '參考現成的簡報模板', score: { 複製力: 1 } },
+                { text: '拖延到最後一刻', score: {} }
+            ]},
+            { text: '你的車胎壓不足，你會怎麼做？', options: [
+                { text: '立刻去加油站充氣', score: { 執行力: 3 } },
+                { text: '檢查輪胎是否有漏氣', score: { 觀察力: 2 } },
+                { text: '猜測可能是氣溫影響', score: { 預測力: 1 } },
+                { text: '繼續開，之後再處理', score: {} }
+            ]},
+            { text: '你在健身房試新器材，不會用，你會怎麼做？', options: [
+                { text: '直接嘗試操作，邊學邊做', score: { 執行力: 3 } },
+                { text: '觀察別人如何使用', score: { 複製力: 2 } },
+                { text: '查器材的使用說明', score: { 執行力: 1 } },
+                { text: '換其他器材', score: {} }
+            ]},
+            { text: '你收到一堆待辦郵件，你會怎麼做？', options: [
+                { text: '立刻回覆急件，逐一處理', score: { 執行力: 3 } },
+                { text: '制定處理的優先順序', score: { 規劃力: 2 } },
+                { text: '分析郵件的重要程度', score: { 分析力: 1 } },
+                { text: '晚點再看，現在忙', score: {} }
+            ]},
+            { text: '你在學新軟體，介面很陌生，你會怎麼做？', options: [
+                { text: '直接點擊功能試驗', score: { 執行力: 3 } },
+                { text: '理解軟體的核心功能', score: { 理解力: 2 } },
+                { text: '參考線上教學影片', score: { 複製力: 1 } },
+                { text: '放棄，換其他軟體', score: {} }
+            ]},
+            // 複製力 (8題)
+            { text: '你想學一道新菜，步驟很複雜，你會怎麼做？', options: [
+                { text: '跟著食譜影片一步步做', score: { 複製力: 3 } },
+                { text: '理解烹飪的原理', score: { 理解力: 2 } },
+                { text: '直接動手，邊做邊學', score: { 執行力: 1 } },
+                { text: '請教會做的人', score: {} }
+            ]},
+            { text: '你在學畫畫，畫得很不像，你會怎麼做？', options: [
+                { text: '模仿大師的作品練習', score: { 複製力: 3 } },
+                { text: '分析自己的畫法問題', score: { 分析力: 2 } },
+                { text: '每天堅持畫，慢慢進步', score: { 執行力: 1 } },
+                { text: '放棄，改學別的', score: {} }
+            ]},
+            { text: '你需要做一個簡報，沒靈感，你會怎麼做？', options: [
+                { text: '參考網上的優秀範例', score: { 複製力: 3 } },
+                { text: '制定簡報的結構計劃', score: { 規劃力: 2 } },
+                { text: '分析觀眾的需求', score: { 分析力: 1 } },
+                { text: '隨意做，交差就好', score: {} }
+            ]},
+            { text: '你在學跳舞，動作很難，你會怎麼做？', options: [
+                { text: '反覆模仿老師的動作', score: { 複製力: 3 } },
+                { text: '理解音樂和動作的節奏', score: { 理解力: 2 } },
+                { text: '每天練習，直到熟練', score: { 執行力: 1 } },
+                { text: '覺得太難，考慮放棄', score: {} }
+            ]},
+            { text: '你想組裝一個模型，說明書很亂，你會怎麼做？', options: [
+                { text: '跟著說明書或影片做', score: { 複製力: 3 } },
+                { text: '檢查零件的用途', score: { 分析力: 2 } },
+                { text: '直接動手試著拼湊', score: { 執行力: 1 } },
+                { text: '找別人幫忙', score: {} }
+            ]},
+            { text: '你在學程式設計，範例程式碼看不懂，你 Dominicana do？', options: [
+                { text: '複製範例程式碼，逐步修改', score: { 複製力: 3 } },
+                { text: '理解程式碼的邏輯', score: { 理解力: 2 } },
+                { text: '分析程式碼的錯誤點', score: { 分析力: 1 } },
+                { text: '換簡單的題目', score: {} }
+            ]},
+            { text: '你想做一個手工藝品，沒經驗，你會怎麼做？', options: [
+                { text: '參考線上的教學步驟', score: { 複製力: 3 } },
+                { text: '制定製作計劃', score: { 規劃力: 2 } },
+                { text: '直接動手試試看', score: { 執行力: 1 } },
+                { text: '請教有經驗的人', score: {} }
+            ]},
+            { text: '你在學瑜伽，動作陌生，你會怎麼做？', options: [
+                { text: '模仿老師的姿勢和呼吸', score: { 複製力: 3 } },
+                { text: '理解每個動作的功效', score: { 理解力: 2 } },
+                { text: '每天練習，慢慢熟悉', score: { 執行力: 1 } },
+                { text: '換別的運動', score: {} }
+            ]}
+        ];
+
+        // 動態生成測驗題目
+        const quizDiv = document.getElementById('quiz');
+        questions.forEach((q, index) => {
+            const questionDiv = document.createElement('div');
+            questionDiv.className = 'question';
+            questionDiv.innerHTML = `<h3>第${index + 1}題：${q.text}</h3>`;
+            q.options.forEach((option, optIndex) => {
+                const label = document.createElement('label');
+                label.innerHTML = `
+                    <input type="radio" name="q${index}" value="${optIndex}" required>
+                    ${option.text}
+                `;
+                questionDiv.appendChild(label);
+                questionDiv.appendChild(document.createElement('br'));
+            });
+            quizDiv.appendChild(questionDiv);
+        });
+
+        // 提交並計算分數
+        function submitQuiz() {
+            const scores = {};
+            abilities.forEach(ability => scores[ability] = 0);
+
+            // 收集答案並計算分數
+            questions.forEach((q, index) => {
+                const selected = document.querySelector(`input[name="q${index}"]:checked`);
+                if (selected) {
+                    const optIndex = parseInt(selected.value);
+                    const option = q.options[optIndex];
+                    for (const ability in option.score) {
+                        scores[ability] += option.score[ability];
+                    }
+                }
+            });
+
+            // 標準化分數（滿分10）
+            const maxScores = {
+                觀察力: 24, // 8題 * 3分
+                分析力: 24, // 8題 * 3分
+                理解力: 21, // 7題 * 3分
+                記憶力: 21, // 7題 * 3分
+                預測力: 21, // 7題 * 3分
+                規劃力: 21, // 7題 * 3分
+                執行力: 24, // 8題 * 3分
+                複製力: 24  // 8題 * 3分
+            };
+            const normalizedScores = abilities.map(ability => 
+                Math.round((scores[ability] / maxScores[ability]) * 10 * 10) / 10
+            );
+
+            // 顯示結果
+            document.getElementById('result').style.display = 'block';
+            const scoresDiv = document.getElementById('scores');
+            scoresDiv.innerHTML = '<h3>各項能力分數（滿分10）：</h3>';
+            abilities.forEach((ability, i) => {
+                scoresDiv.innerHTML += `<p>${ability}：${normalizedScores[i]}</p>`;
+            });
+
+            // 繪製雷達圖
+            const ctx = document.getElementById('radarChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: abilities,
+                    datasets: [{
+                        label: '您的能力',
+                        data: normalizedScores,
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        r: {
+                            suggestedMin: 0,
+                            suggestedMax: 10
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
